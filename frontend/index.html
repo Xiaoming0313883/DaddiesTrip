@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DaddiesTrip - NomadFlow</title>
+    <meta name="description" content="AI-enabled cross-border travel orchestration and multi-currency group accounting.">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-blur"></div>
+    <div class="container">
+        <header>
+            <h1 id="app-title">DaddiesTrip</h1>
+            <p>Your AI Travel Orchestrator</p>
+        </header>
+
+        <main>
+            <div class="glass-card chat-section">
+                <h2>Plan Your Trip</h2>
+                <div class="input-group">
+                    <textarea id="prompt-input" placeholder="E.g., Plan a 5-day trip to Tokyo for 4 people. Find the best early bird deals."></textarea>
+                    <button id="generate-btn">Generate Itinerary</button>
+                </div>
+            </div>
+
+            <div id="results-section" class="hidden">
+                <div id="budget-banner" class="budget-banner hidden">
+                    <div class="banner-icon"></div>
+                    <div class="banner-text">
+                        <h4 id="budget-status"></h4>
+                        <p id="budget-message"></p>
+                    </div>
+                </div>
+                
+                <div class="glass-card flights-section">
+                    <h2>Flights Overview</h2>
+                    <div class="flight-details">
+                        <span class="flight-cost" id="flight-cost"></span>
+                        <a href="#" class="source-link" id="flight-source" target="_blank">View Source</a>
+                    </div>
+                </div>
+
+                <div class="glass-card itinerary-section">
+                    <h2>Generated Itinerary</h2>
+                    <div id="itinerary-content"></div>
+                </div>
+
+                <div class="glass-card ledger-section">
+                    <h2>Dynamic Ledger</h2>
+                    <div class="split-info">
+                        <div class="stat-box">
+                            <span class="label">Total Cost</span>
+                            <h3 id="total-cost"></h3>
+                        </div>
+                        <div class="stat-box">
+                            <span class="label">Per Person</span>
+                            <h3 id="split-person"></h3>
+                        </div>
+                        <div class="stat-box highlight">
+                            <span class="label">Local (MYR)</span>
+                            <h3 id="split-local"></h3>
+                        </div>
+                    </div>
+                    
+                    <div class="settlement-ui">
+                        <h3>Simulate Settlement</h3>
+                        <input type="text" id="card-input" placeholder="Card Number (e.g., 4111...)">
+                        <button id="settle-btn">Settle Balance</button>
+                        <p id="settle-message"></p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <div id="full-page-overlay" class="hidden">
+        <div class="overlay-content">
+            <div id="overlay-spinner" class="spinner"></div>
+            <h3 id="overlay-message">Orchestrating your trip...</h3>
+            <div class="progress-container hidden" id="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <p id="overlay-status-text" class="status-text hidden"></p>
+            <p id="overlay-error" class="hidden"></p>
+            <button id="overlay-close" class="hidden">Close</button>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
