@@ -1,24 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DaddiesTrip - NomadFlow</title>
-    <meta name="description" content="AI-enabled cross-border travel orchestration and multi-currency group accounting.">
+    <title>DaddiesTrip</title>
+    <meta name="description"
+        content="AI-enabled cross-border travel orchestration and multi-currency group accounting.">
     <link rel="stylesheet" href="style.css?v=4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 </head>
+
 <body>
     <div class="background-blur"></div>
     <div class="app-container">
         <header class="app-header">
-            <h1>NomadFlow</h1>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 5px;">
+                <img src="logo.jpeg" alt="DaddiesTrip Logo"
+                    style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover;">
+                <h1>DaddiesTrip</h1>
+            </div>
             <p>Your AI-Orchestrated Travel Experience</p>
         </header>
 
         <main class="main-content">
             <div class="input-section glass-card">
-                <textarea id="prompt-input" placeholder="Plan a 7-day trip to Singapore for 4 adults with a budget of RM20000..."></textarea>
+                <textarea id="prompt-input"
+                    placeholder="Plan a 7-day trip to Singapore for 4 adults with a budget of RM20000..."></textarea>
                 <button id="generate-btn">Orchestrate Trip</button>
             </div>
 
@@ -30,7 +38,7 @@
                         <p id="budget-message"></p>
                     </div>
                 </div>
-                
+
                 <!-- Flights Section: dropdown-based -->
                 <div class="glass-card flights-section hidden">
                     <h2>✈️ Flight Options</h2>
@@ -63,7 +71,7 @@
                             <h3 id="split-local"></h3>
                         </div>
                     </div>
-                    
+
                     <div class="settlement-ui">
                         <button id="review-budget-btn" class="primary-btn">Review &amp; Settle Payment</button>
                     </div>
@@ -118,7 +126,7 @@
                     <strong id="acc-total">0</strong>
                 </div>
             </div>
-            
+
             <!-- Premium Payment UI -->
             <div class="payment-section">
                 <h3>Secure Payment</h3>
@@ -140,7 +148,8 @@
                     <div class="card-fields">
                         <div class="field-group">
                             <label>Card Number</label>
-                            <input type="text" id="card-input" placeholder="1234 5678 9012 3456" maxlength="19" autocomplete="cc-number">
+                            <input type="text" id="card-input" placeholder="1234 5678 9012 3456" maxlength="19"
+                                autocomplete="cc-number">
                         </div>
                         <div class="field-group">
                             <label>Cardholder Name</label>
@@ -149,7 +158,8 @@
                         <div class="field-row">
                             <div class="field-group">
                                 <label>Expiry</label>
-                                <input type="text" id="card-expiry" placeholder="MM/YY" maxlength="5" autocomplete="cc-exp">
+                                <input type="text" id="card-expiry" placeholder="MM/YY" maxlength="5"
+                                    autocomplete="cc-exp">
                             </div>
                             <div class="field-group">
                                 <label>CVV</label>
@@ -170,8 +180,10 @@
         <div class="payment-content glass-card">
             <div class="success-animation">
                 <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" class="success-svg">
-                    <circle class="success-circle" cx="50" cy="50" r="45" fill="none" stroke="#34c759" stroke-width="6"/>
-                    <path class="success-check" d="M25 50 L43 68 L75 32" fill="none" stroke="#34c759" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle class="success-circle" cx="50" cy="50" r="45" fill="none" stroke="#34c759"
+                        stroke-width="6" />
+                    <path class="success-check" d="M25 50 L43 68 L75 32" fill="none" stroke="#34c759" stroke-width="7"
+                        stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
             </div>
             <h3 id="payment-status-text">Payment Successful</h3>
@@ -179,6 +191,13 @@
         </div>
     </div>
 
-    <script src="app.js?v=4"></script>
+    <!-- PDF Action Container -->
+    <div id="pdf-action-container" class="hidden glass-card" style="margin-top: 1rem; text-align: center;">
+        <button id="download-pdf-btn" class="primary-btn">📥 Download Itinerary as PDF</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="app.js?v=5"></script>
 </body>
+
 </html>

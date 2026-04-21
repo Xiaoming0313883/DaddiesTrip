@@ -9,23 +9,14 @@ class LedgerService:
 
     def _fetch_rates(self):
         try:
-            # Free API requires no key
-            response = requests.get(f"https://api.exchangerate-api.com/v4/latest/{self.base_currency}", timeout=5)
-            if response.status_code == 200:
-                self.exchange_rates = response.json().get("rates", {})
-        except requests.exceptions.RequestException:
-            # Fallback mock rates if API is down
-            self.exchange_rates = {
-                "MYR": 1.0,
-                "CNY": 1.52,
-                "JPY": 32.0,
-                "KRW": 286.0,
-                "SGD": 0.28,
-                "THB": 7.7,
-                "USD": 0.21,
-                "EUR": 0.19
-            }
-
+            url = f"https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/{self.base_currency.lower()}.json"
+            response = requests.get(url, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            self.exchange_rates = {k.upper(): v for k, v in data.get(self.base_currency.lower(), {}).items()}
+        except requests.exceptions.RequestException as e:
+            # PRD requirement: Throw an explicit error to prevent bad conversions rather than falling back to constants
+            raise ValueError(f"Failed to fetch live currency rates: {str(e)}")
     def calculate_split(self, total_cost_myr: float, destination_currency: str, participants: list) -> dict:
         """
         Splits the expense equally among participants using Pandas for robust aggregation.

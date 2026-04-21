@@ -23,29 +23,64 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
     startProgress();
 
     try {
-        const response = await fetch('/api/plan-trip', {
+        const response = await fetch('/api/plan-trip-stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prompt })
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
-            renderBudgetAnalysis(data.budget_recommendation);
-            if (data.flight_options && data.flight_options.length > 0) {
-                renderFlightOptions(data.flight_options);
-            } else if (data.flights) {
-                renderFlightOptions([data.flights]);
-            }
-            renderItinerary(data.itinerary);
-            renderLedger(data.split, data.itinerary, data.flights || (data.flight_options && data.flight_options[0]));
-            resultsSection.classList.remove('hidden');
-            resultsSection.scrollIntoView({ behavior: 'smooth' });
-            success = true;
-        } else {
+        if (!response.ok) {
+            const errData = await response.json();
             stopProgress(false);
-            showErrorInOverlay(data.detail || 'Failed to generate itinerary.');
+            showErrorInOverlay(errData.detail || 'Failed to connect.');
+            btn.disabled = false;
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            let lines = buffer.split('\n\n');
+            buffer = lines.pop(); // keep last incomplete part
+
+            for (let line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.substring(6);
+                    try {
+                        const event = JSON.parse(dataStr);
+                        if (event.type === 'progress') {
+                            updateProgressStatus(event.text);
+                        } else if (event.type === 'error') {
+                            stopProgress(false);
+                            showErrorInOverlay(event.message);
+                            btn.disabled = false;
+                            return; // exit loop
+                        } else if (event.type === 'complete') {
+                            const data = event.data;
+                            renderBudgetAnalysis(data.budget_recommendation);
+                            if (data.flight_options && data.flight_options.length > 0) {
+                                renderFlightOptions(data.flight_options);
+                            } else if (data.flights) {
+                                renderFlightOptions([data.flights]);
+                            }
+                            renderItinerary(data.itinerary);
+                            renderLedger(data.split, data.itinerary, data.flights || (data.flight_options && data.flight_options[0]));
+                            resultsSection.classList.remove('hidden');
+                            if (document.getElementById('pdf-action-container')) {
+                                document.getElementById('pdf-action-container').classList.remove('hidden');
+                            }
+                            resultsSection.scrollIntoView({ behavior: 'smooth' });
+                            success = true;
+                        }
+                    } catch (e) { console.error('Parse error', e); }
+                }
+            }
         }
     } catch (error) {
         console.error('Frontend Error:', error);
@@ -60,38 +95,30 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
     }
 });
 
+let currentProgress = 0;
+
 function startProgress() {
     const container = document.getElementById('progress-container');
     const bar = document.getElementById('progress-bar');
     const statusText = document.getElementById('overlay-status-text');
-    let progress = 0;
-    
-    const statuses = [
-        { threshold: 0, text: 'Planner: Drafting logical route...' },
-        { threshold: 20, text: 'Booking: Sourcing flights and hotels...' },
-        { threshold: 40, text: 'Budget: Optimizing costs and currency...' },
-        { threshold: 60, text: 'Edge Agent: Validating data integrity...' },
-        { threshold: 80, text: 'Translator: Finalizing local details...' },
-        { threshold: 95, text: 'Polishing the itinerary...' }
-    ];
+    currentProgress = 0;
 
     bar.style.width = '0%';
     container.classList.remove('hidden');
     statusText.classList.remove('hidden');
+    statusText.innerText = "Initializing orchestrator...";
+}
 
-    window._progressInterval = setInterval(() => {
-        if (progress < 95) {
-            progress += Math.random() * 4;
-            progress = Math.min(progress, 95);
-            bar.style.width = `${progress}%`;
-            const current = [...statuses].reverse().find(s => progress >= s.threshold);
-            if (current) statusText.innerText = current.text;
-        }
-    }, 800);
+function updateProgressStatus(text) {
+    const statusText = document.getElementById('overlay-status-text');
+    const bar = document.getElementById('progress-bar');
+    statusText.innerText = text;
+    currentProgress += 15;
+    if (currentProgress > 95) currentProgress = 95;
+    bar.style.width = `${currentProgress}%`;
 }
 
 function stopProgress(success) {
-    clearInterval(window._progressInterval);
     const bar = document.getElementById('progress-bar');
     const statusText = document.getElementById('overlay-status-text');
     if (success) {
@@ -106,9 +133,12 @@ function showErrorInOverlay(errorMessage) {
     const overlayError = document.getElementById('overlay-error');
     const overlayClose = document.getElementById('overlay-close');
 
+    // Keep detailed errors in the console
+    console.error('Backend Detail:', errorMessage);
+
     overlaySpinner.classList.add('hidden');
     overlayMessage.innerText = 'Error';
-    overlayError.innerText = errorMessage;
+    overlayError.innerText = 'An error occurred during orchestration. Please contact the admin.';
     overlayError.classList.remove('hidden');
     overlayClose.classList.remove('hidden');
 }
@@ -121,11 +151,11 @@ function renderBudgetAnalysis(recommendation) {
     const banner = document.getElementById('budget-banner');
     const status = document.getElementById('budget-status');
     const message = document.getElementById('budget-message');
-    
+
     if (!recommendation) { banner.classList.add('hidden'); return; }
-    
+
     banner.classList.remove('hidden', 'success', 'warning');
-    
+
     if (recommendation.is_sufficient) {
         banner.classList.add('success');
         status.innerText = 'Budget Looks Good';
@@ -143,25 +173,39 @@ function renderFlightOptions(options) {
     const list = document.getElementById('flight-options-list');
     const costEl = document.getElementById('flight-cost');
     const sourceEl = document.getElementById('flight-source');
-    
-    if (!options || options.length === 0) { section.classList.add('hidden'); return; }
-    
+    const subtitle = document.querySelector('.flights-subtitle');
+
+    if (!options || options.length === 0) {
+        section.classList.remove('hidden');
+        list.innerHTML = '<div style="padding: 1rem; background: var(--bg-card); border-radius: 8px;"><strong>🚗 Local Trip:</strong> Flights are not required for this itinerary route. Enjoy your drive/transit!</div>';
+        costEl.innerText = `RM 0`;
+        sourceEl.classList.add('hidden');
+        if (subtitle) subtitle.classList.add('hidden');
+        selectedFlightOption = { cost_myr: 0 };
+        return;
+    }
+
     section.classList.remove('hidden');
+    sourceEl.classList.remove('hidden');
+    if (subtitle) subtitle.classList.remove('hidden');
     list.innerHTML = '';
-    
+
     options.forEach((opt, i) => {
         const dep = opt.departure || {};
         const ret = opt.return || {};
-        const airline = opt.airline || `Option ${i+1}`;
+        const airline = opt.airline || `Option ${i + 1}`;
+        const iata = opt.airline_iata || "MH";
+        const iconUrl = `https://pics.avs.io/60/60/${iata}.png`;
         const cost = opt.cost_myr || 0;
         const depStr = `KUL ${dep.time || ''} ${dep.date || ''}`;
         const retStr = `${ret.airport || '?'} → KUL ${ret.time || ''}`;
-        
+
         const row = document.createElement('label');
         row.className = 'flight-option-row' + (i === 0 ? ' selected' : '');
         row.innerHTML = `
             <input type="radio" name="flight_pick" value="${i}" ${i === 0 ? 'checked' : ''}>
             <div class="flight-option-info">
+                <img src="${iconUrl}" alt="${airline} logo" width="30" height="30" style="border-radius: 4px; object-fit: cover; margin-right: 10px;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><path d=%22M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z%22/></svg>';" />
                 <span class="flight-airline">${airline}</span>
                 <span class="flight-route">${depStr} → ${retStr}</span>
             </div>
@@ -177,7 +221,7 @@ function renderFlightOptions(options) {
         });
         list.appendChild(row);
     });
-    
+
     selectedFlightOption = options[0];
     costEl.innerText = `RM ${options[0].cost_myr || 0}`;
     const src0 = options[0].source || '#';
@@ -191,25 +235,29 @@ function renderItinerary(itinerary) {
     itinerary.forEach(day => {
         const card = document.createElement('div');
         card.className = 'day-card';
-        
+
         const activitiesHtml = day.activities ? day.activities.map(act => {
-            const gmapLink = `https://www.google.com/maps/search/${encodeURIComponent((act.name || 'attraction'))}`;
-            const sourceHref = (act.source && act.source.startsWith('http')) ? act.source : gmapLink;
             const nameLC = (act.name || '').toLowerCase();
             const isTicketed = nameLC.includes('ticket required');
             const isFree = nameLC.includes('free');
             const badgeHtml = isTicketed
                 ? `<span class="ticket-badge required">🎟 Ticket Required</span>`
                 : isFree ? `<span class="ticket-badge free">✓ Free Entry</span>` : '';
+
+            const embedMap = `https://maps.google.com/maps?q=${encodeURIComponent(act.name + ' ' + day.location)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+
             return `
             <li>
                 <div class="activity-header">
                     <span class="activity-name">${act.name}</span>
+                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 4px;">🗓 ${act.schedule || 'Scheduled Time'}</div>
                     ${badgeHtml}
                 </div>
-                <div class="activity-meta">
+                <div class="activity-meta" style="margin-bottom: 10px;">
                     <span class="cost-tag">RM ${act.cost_myr || 0}</span>
-                    <a href="${sourceHref}" target="_blank" class="source-link">📍 Map ↗</a>
+                </div>
+                <div class="map-embed-container" style="border-radius: 8px; overflow: hidden; margin-top: 10px; border: 1px solid rgba(255,255,255,0.1);">
+                    <iframe src="${embedMap}" width="100%" height="150" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
                 </div>
             </li>`;
         }).join('') : '';
@@ -270,7 +318,7 @@ document.getElementById('close-budget-btn').addEventListener('click', () => {
 function populateAccountingTable(data) {
     const { split, itinerary, flights } = data;
     let hotelTotal = 0, foodTotal = 0, transTotal = 0, actTotal = 0;
-    
+
     itinerary.forEach(day => {
         hotelTotal += (day.hotel ? day.hotel.cost_myr : 0);
         foodTotal += (day.daily_food_cost_myr || 0);
@@ -279,7 +327,7 @@ function populateAccountingTable(data) {
     });
 
     const flightCost = selectedFlightOption ? (selectedFlightOption.cost_myr || 0) : (flights ? (flights.cost_myr || 0) : 0);
-    
+
     document.getElementById('acc-flights').innerText = `RM ${flightCost}`;
     document.getElementById('acc-hotel').innerText = `RM ${hotelTotal}`;
     document.getElementById('acc-food').innerText = `RM ${foodTotal}`;
@@ -321,7 +369,7 @@ document.getElementById('settle-btn').addEventListener('click', async () => {
     document.getElementById('budget-modal').classList.add('hidden');
     const paymentModal = document.getElementById('payment-modal');
     const statusText = document.getElementById('payment-status-text');
-    
+
     paymentModal.classList.remove('hidden');
     statusText.innerText = 'Processing...';
 
@@ -350,4 +398,24 @@ document.getElementById('settle-btn').addEventListener('click', async () => {
             document.getElementById('budget-modal').classList.remove('hidden');
         }
     }, 2000);
+});
+
+// PDF Generation
+document.getElementById('download-pdf-btn').addEventListener('click', () => {
+    const element = document.getElementById('results-section');
+    const opt = {
+        margin: 0.5,
+        filename: 'DaddiesTrip_Itinerary.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    // Hide buttons temporarily
+    document.getElementById('pdf-action-container').classList.add('hidden');
+    document.querySelector('.settlement-ui').classList.add('hidden');
+
+    html2pdf().set(opt).from(element).save().then(() => {
+        document.getElementById('pdf-action-container').classList.remove('hidden');
+        document.querySelector('.settlement-ui').classList.remove('hidden');
+    });
 });

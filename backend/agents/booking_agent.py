@@ -10,9 +10,11 @@ class BookingAgent(BaseAgent):
         
         CRITICAL RULES - VIOLATIONS WILL BE REJECTED:
         1. FLIGHTS:
-           - Departure MUST always be "KUL" (Kuala Lumpur International Airport).
-           - Return departure airport MUST be the destination airport code (e.g. "PVG" for Shanghai, "SIN" for Singapore, "NRT" for Tokyo) — NEVER "KUL".
-           - Provide EXACTLY 3 flight options with different airlines/times. The user will pick from a dropdown.
+           - Check the 'requires_flight' flag from the planner. If false, output an empty array for flight_options: "flight_options": [].
+           - If requires_flight is true: Departure MUST always be "KUL" (Kuala Lumpur International Airport).
+           - Return departure airport MUST be the destination airport code.
+           - Provide EXACTLY 3 flight options with different airlines/times.
+           - Include the "airline_iata" precisely (e.g. "AK" for AirAsia, "TR" for Scoot). This is required for frontend SVGs.
            - Source links MUST be Skyscanner deep links in this exact format:
              https://www.skyscanner.com.my/transport/flights/kul/[DEST_IATA_CODE]/{str(current_year)[2:]}MMDD/{str(current_year)[2:]}MMDD/
            - Dates MUST be in {current_year}.
@@ -40,6 +42,7 @@ class BookingAgent(BaseAgent):
             "flight_options": [
                 {{
                     "airline": "AirAsia",
+                    "airline_iata": "AK",
                     "cost_myr": 900,
                     "departure": {{"airport": "KUL", "time": "08:00 AM", "date": "{current_year}-06-01"}},
                     "return": {{"airport": "SIN", "time": "18:00 PM", "date": "{current_year}-06-05"}},
@@ -47,6 +50,7 @@ class BookingAgent(BaseAgent):
                 }},
                 {{
                     "airline": "Malaysia Airlines",
+                    "airline_iata": "MH",
                     "cost_myr": 1100,
                     "departure": {{"airport": "KUL", "time": "10:30 AM", "date": "{current_year}-06-01"}},
                     "return": {{"airport": "SIN", "time": "20:00 PM", "date": "{current_year}-06-05"}},
@@ -54,6 +58,7 @@ class BookingAgent(BaseAgent):
                 }},
                 {{
                     "airline": "Scoot",
+                    "airline_iata": "TR",
                     "cost_myr": 750,
                     "departure": {{"airport": "KUL", "time": "06:00 AM", "date": "{current_year}-06-01"}},
                     "return": {{"airport": "SIN", "time": "16:00 PM", "date": "{current_year}-06-05"}},
