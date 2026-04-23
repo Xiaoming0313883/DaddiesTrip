@@ -7,7 +7,7 @@
     <title>DaddiesTrip</title>
     <meta name="description"
         content="AI-enabled cross-border travel orchestration and multi-currency group accounting.">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=8">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 </head>
 
@@ -45,7 +45,7 @@
                     <p class="flights-subtitle">Select a flight from KUL to your destination:</p>
                     <div id="flight-options-list" class="flight-options-list"></div>
                     <div class="flight-cost-footer">
-                        <span>Selected: <strong id="flight-cost" class="cost-tag">RM 0</strong></span>
+                        <span>Selected total: <strong id="flight-cost" class="cost-tag">RM 0</strong></span>
                         <a href="#" class="source-link" id="flight-source" target="_blank">Search on Skyscanner ↗</a>
                     </div>
                 </div>
@@ -73,7 +73,10 @@
                     </div>
 
                     <div class="settlement-ui">
-                        <button id="review-budget-btn" class="primary-btn">Review &amp; Settle Payment</button>
+                        <div class="action-buttons-row">
+                            <button id="download-pdf-btn" class="secondary-btn action-btn">📥 Download Itinerary PDF</button>
+                            <button id="review-budget-btn" class="primary-btn action-btn">Review &amp; Settle Payment</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -191,13 +194,8 @@
         </div>
     </div>
 
-    <!-- PDF Action Container -->
-    <div id="pdf-action-container" class="hidden glass-card" style="margin-top: 1rem; text-align: center;">
-        <button id="download-pdf-btn" class="primary-btn">📥 Download Itinerary as PDF</button>
-    </div>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=10"></script>
 </body>
 
 </html>

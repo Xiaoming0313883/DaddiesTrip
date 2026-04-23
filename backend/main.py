@@ -4,6 +4,7 @@ import json
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from backend.agents.mock_agents import OrchestratorAgent
+from backend.agents.base_agent import AgentAPIError
 from backend.ledger.ledger_service import LedgerService
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -36,15 +37,29 @@ async def plan_trip_stream(request: TripRequest):
             for event in orchestrator.process_prompt_stream(request.prompt):
                 if event.get("type") == "complete":
                     # add split calculation
-                    split_data = ledger_service.calculate_split(
-                        total_cost_myr=event["data"].get('estimated_total_cost_myr', 0),
-                        destination_currency=event["data"].get('destination_currency', 'MYR'),
-                        participants=event["data"].get('participants', [])
-                    )
-                    event["data"]["split"] = split_data
+                    try:
+                        split_data = ledger_service.calculate_split(
+                            total_cost_myr=event["data"].get('estimated_total_cost_myr', 0),
+                            destination_currency=event["data"].get('destination_currency', 'MYR'),
+                            participants=event["data"].get('participants', [])
+                        )
+                        event["data"]["split"] = split_data
+                    except Exception as split_err:
+                        print(f"Split calculation error: {split_err}")
+                        event["data"]["split"] = {
+                            "primary_currency": "MYR",
+                            "destination_currency": event["data"].get('destination_currency', 'MYR'),
+                            "total_myr": event["data"].get('estimated_total_cost_myr', 0),
+                            "split_per_person_myr": 0,
+                            "split_per_person_local": 0
+                        }
                 yield f"data: {json.dumps(event)}\n\n"
+        except AgentAPIError as e:
+            print(f"Orchestration API error: {e.detail or e.user_message}")
+            yield f"data: {json.dumps({'type': 'error', 'message': e.user_message})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            print(f"Orchestration error: {type(e).__name__}: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': f'An unexpected error occurred: {type(e).__name__}. Please try again.'})}\n\n"
             
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
