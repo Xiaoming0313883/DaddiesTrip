@@ -1151,3 +1151,230 @@ button:active {
         gap: 1rem;
     }
 }
+
+/* ───── Input Actions Row (Generate + Mic) ───── */
+.input-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.input-actions-row #generate-btn {
+    flex: 1;
+    align-self: stretch;
+}
+
+/* ───── Voice Button ───── */
+.voice-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(0, 113, 227, 0.08);
+    border: 2px solid rgba(0, 113, 227, 0.2);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+}
+
+.voice-btn:hover {
+    background: rgba(0, 113, 227, 0.14);
+    border-color: var(--accent);
+    transform: scale(1.06);
+}
+
+.voice-btn.recording {
+    background: rgba(255, 59, 48, 0.1);
+    border-color: var(--error);
+    animation: mic-pulse 1.4s ease-in-out infinite;
+}
+
+.voice-btn.recording .voice-icon {
+    animation: none;
+}
+
+.voice-icon {
+    font-size: 1.2rem;
+    line-height: 1;
+    user-select: none;
+}
+
+@keyframes mic-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.35);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(255, 59, 48, 0);
+    }
+}
+
+/* ───── Voice Status Label ───── */
+.voice-status {
+    margin-top: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    min-height: 1.2em;
+    text-align: left;
+    transition: color 0.2s ease;
+    animation: fadeIn 0.3s ease;
+}
+
+.voice-status.listening {
+    color: var(--error);
+    font-weight: 500;
+}
+
+.voice-status.error {
+    color: var(--error);
+}
+
+/* ───── Transport Connector (between activities) ───── */
+.transport-connector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.5rem 0.3rem 1.25rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    background: rgba(0, 113, 227, 0.03);
+    border-left: 2px dashed rgba(0, 113, 227, 0.2);
+    margin: 0.1rem 0 0.1rem 0.5rem;
+    border-radius: 0 6px 6px 0;
+}
+
+.transport-connector .tc-mode {
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.transport-connector .tc-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+}
+
+.transport-connector .tc-duration {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+}
+
+.transport-connector .tc-notes {
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+    font-style: italic;
+}
+
+.transport-connector .tc-cost {
+    margin-left: auto;
+    background: rgba(0, 113, 227, 0.08);
+    color: var(--accent);
+    padding: 0.1rem 0.35rem;
+    border-radius: 5px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ───── Clarification Banner (bright blue) ───── */
+.clarification-banner {
+    background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+    border: 1.5px solid #3b82f6;
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    animation: fadeIn 0.35s ease;
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+}
+
+.clarif-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.6rem;
+}
+
+.clarif-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #1d4ed8;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.clarif-close {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    color: #3b82f6;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    line-height: 1;
+    transition: background 0.2s;
+}
+.clarif-close:hover { background: rgba(59, 130, 246, 0.15); }
+
+.clarif-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.65rem;
+}
+
+.missing-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #3b82f6;
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    letter-spacing: 0.01em;
+}
+
+.clarif-message {
+    font-size: 0.88rem;
+    color: #1e40af;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* ───── Skeleton Shimmer (partial itinerary loading) ───── */
+@keyframes shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+
+.skeleton-line {
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #e8e8eb 25%, #f4f4f6 50%, #e8e8eb 75%);
+    background-size: 800px 100%;
+    animation: shimmer 1.4s infinite linear;
+    margin-bottom: 6px;
+}
+
+.skeleton-line.short { width: 45%; }
+.skeleton-line.medium { width: 70%; }
+.skeleton-line.full   { width: 100%; }
+
+.partial-loading-tag {
+    display: inline-block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-style: italic;
+    padding: 0.1rem 0.4rem;
+    background: rgba(0,0,0,0.04);
+    border-radius: 5px;
+    margin-top: 0.3rem;
+}

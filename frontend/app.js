@@ -10,6 +10,10 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
     const overlayClose = document.getElementById('overlay-close');
     const resultsSection = document.getElementById('results-section');
 
+    // Dismiss any existing clarification banner when starting a new generation
+    const existingClarif = document.getElementById('clarification-banner');
+    if (existingClarif) existingClarif.remove();
+
     overlaySpinner.classList.remove('hidden');
     overlayMessage.innerText = 'Orchestrating your trip...';
     overlayError.classList.add('hidden');
@@ -77,9 +81,18 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
                             return;
                         } else if (event.type === 'clarification') {
                             stopProgress(false);
-                            showClarificationInOverlay(event.message);
+                            overlay.classList.add('hidden');
+                            showClarificationBanner(
+                                event.message,
+                                event.missing_fields || []
+                            );
                             btn.disabled = false;
                             return;
+                        } else if (event.type === 'partial_itinerary') {
+                            renderPartialItinerary(event.days, event.num_participants);
+                            resultsSection.classList.remove('hidden');
+                        } else if (event.type === 'partial_flights') {
+                            renderFlightOptions(event.flight_options, event.num_participants);
                         } else if (event.type === 'complete') {
                             const data = event.data;
                             const numPax = data.num_participants || data.participants?.length || 1;
@@ -164,6 +177,40 @@ function showErrorInOverlay(msg) {
     // Also show a banner on the main page
     showErrorBanner(msg);
 }
+function showClarificationBanner(msg, missingFields) {
+    // Remove any existing clarification banner
+    const existing = document.getElementById('clarification-banner');
+    if (existing) existing.remove();
+
+    const PILL_MAP = {
+        destination:  { icon: '📍', label: 'Destination' },
+        trip_dates:   { icon: '🗓️', label: 'Trip Dates' },
+        participants: { icon: '👥', label: 'Participants' },
+        budget:       { icon: '💰', label: 'Budget' },
+    };
+
+    const pillsHtml = (missingFields || []).map(f => {
+        const p = PILL_MAP[f] || { icon: '❓', label: f };
+        return `<span class="missing-pill">${p.icon} ${p.label}</span>`;
+    }).join('');
+
+    const banner = document.createElement('div');
+    banner.id = 'clarification-banner';
+    banner.className = 'clarification-banner';
+    banner.innerHTML = `
+        <div class="clarif-header">
+            <span class="clarif-title">📋 Missing Information</span>
+            <button class="clarif-close" onclick="this.closest('#clarification-banner').remove()">✕</button>
+        </div>
+        ${pillsHtml ? `<div class="clarif-pills">${pillsHtml}</div>` : ''}
+        <p class="clarif-message">${msg || 'Please add the missing details to your request.'}</p>
+    `;
+
+    const inputSection = document.querySelector('.input-section');
+    inputSection.insertAdjacentElement('afterend', banner);
+    banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 function showClarificationInOverlay(msg) {
     document.getElementById('overlay-spinner').classList.add('hidden');
     document.getElementById('overlay-message').innerText = 'Tell me more';
@@ -257,14 +304,17 @@ function renderFlightOptions(options, numPax) {
             }
         }
 
-        // Build Google Flights link with specific date
+        // Build Google Flights link with specific date + locale params for reliable deep-link
         let googleFlightsHref = opt.google_flights || '#';
         if (googleFlightsHref === '#' || !googleFlightsHref.includes('on+')) {
             const destIATA = ret.airport || 'SIN';
+            const airlineName = (opt.airline || '').replace(/\s+/g, '+');
             const depDateStr = dep.date || '';
             if (depDateStr) {
-                googleFlightsHref = `https://www.google.com/travel/flights?q=Flights+from+KUL+to+${destIATA}+on+${depDateStr}&curr=MYR`;
+                googleFlightsHref = `https://www.google.com/travel/flights?q=Flights+from+KUL+to+${destIATA}+on+${depDateStr}${airlineName ? '+with+' + airlineName : ''}&curr=MYR&hl=en&gl=MY`;
             }
+        } else if (!googleFlightsHref.includes('hl=en')) {
+            googleFlightsHref += '&hl=en&gl=MY';
         }
 
         const row = document.createElement('label');
@@ -320,8 +370,11 @@ function renderFlightOptions(options, numPax) {
     let gf0 = options[0].google_flights || '#';
     if (gf0 === '#' || !gf0.includes('on+')) {
         const destIATA = (options[0].return || {}).airport || 'SIN';
+        const airlineName0 = (options[0].airline || '').replace(/\s+/g, '+');
         const depDateStr = (options[0].departure || {}).date || '';
-        if (depDateStr) gf0 = `https://www.google.com/travel/flights?q=Flights+from+KUL+to+${destIATA}+on+${depDateStr}&curr=MYR`;
+        if (depDateStr) gf0 = `https://www.google.com/travel/flights?q=Flights+from+KUL+to+${destIATA}+on+${depDateStr}${airlineName0 ? '+with+' + airlineName0 : ''}&curr=MYR&hl=en&gl=MY`;
+    } else if (!gf0.includes('hl=en')) {
+        gf0 += '&hl=en&gl=MY';
     }
     sourceEl.href = gf0.startsWith('http') ? gf0 : `https://${gf0}`;
     sourceEl.innerText = `Search ${options[0].airline || 'Flights'} on Google Flights ↗`;
@@ -335,6 +388,66 @@ function renderStars(rating) {
     for (let s = 0; s < Math.floor(num); s++) stars += '★';
     if ((num - Math.floor(num)) >= 0.3) stars += '½';
     return `<span class="dest-stars">${stars}</span>`;
+}
+
+function renderPartialItinerary(days, numPax) {
+    const container = document.getElementById('itinerary-content');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    if (days && days.length > 0) {
+        const destName = days[0].location || 'Destination';
+        const reviewCard = document.createElement('div');
+        reviewCard.className = 'destination-review';
+        reviewCard.innerHTML = `<div class="dest-info"><div class="dest-name">${destName}</div></div>`;
+        container.appendChild(reviewCard);
+    }
+
+    days.forEach((day, dayIdx) => {
+        const card = document.createElement('div');
+        card.className = 'day-card';
+        const dayNum = day.day || (dayIdx + 1);
+        const dayLocation = day.location || 'Destination';
+
+        let activitiesHtml = '';
+        if (day.activities && day.activities.length > 0) {
+            day.activities.forEach(act => {
+                activitiesHtml += `
+                <li>
+                    <div class="activity-header">
+                        <span class="activity-name">${act.name || 'Activity'}</span>
+                        <div style="font-size:0.8em; color:var(--text-secondary);">${act.schedule || ''}</div>
+                    </div>
+                </li>`;
+            });
+        } else {
+            activitiesHtml = '<li><div class="skeleton-line medium"></div></li>';
+        }
+
+        card.innerHTML = `
+            <h4>Day ${dayNum}: ${dayLocation}</h4>
+            <ul>${activitiesHtml}</ul>
+            <div class="daily-modules">
+                <div class="module-box">
+                    <h5>Stay</h5>
+                    <div class="skeleton-line full"></div>
+                    <div class="skeleton-line short"></div>
+                    <span class="partial-loading-tag">⏳ Loading cost...</span>
+                </div>
+                <div class="module-box">
+                    <h5>Eat</h5>
+                    <div class="skeleton-line medium"></div>
+                    <span class="partial-loading-tag">⏳ Loading cost...</span>
+                </div>
+                <div class="module-box">
+                    <h5>Transit</h5>
+                    <div class="skeleton-line short"></div>
+                    <span class="partial-loading-tag">⏳ Loading cost...</span>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
 }
 
 function renderItinerary(itinerary, destinationReview, numPax) {
@@ -370,43 +483,74 @@ function renderItinerary(itinerary, destinationReview, numPax) {
         container.appendChild(reviewCard);
     }
 
-    itinerary.forEach(day => {
+    itinerary.forEach((day, dayIdx) => {
         const card = document.createElement('div');
         card.className = 'day-card';
 
-        const activitiesHtml = day.activities ? day.activities.map(act => {
-            const nameLC = (act.name || '').toLowerCase();
-            const isTicketed = nameLC.includes('ticket required');
-            const isFree = nameLC.includes('free');
-            const badgeHtml = isTicketed
-                ? `<span class="ticket-badge required">Ticket</span>`
-                : isFree ? `<span class="ticket-badge free">Free</span>` : '';
+        // Defensive: ensure day number and location always have values
+        const dayNum = day.day || (dayIdx + 1);
+        const dayLocation = day.location || 'Destination';
+        const dayActivities = Array.isArray(day.activities) ? day.activities : [];
 
-            const embedMap = `https://maps.google.com/maps?q=${encodeURIComponent(act.name + ' ' + day.location)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
-            const actCostPax = act.cost_myr || 0;
-            const actCostTotal = actCostPax * numPax;
+        // Mode icons for transport connectors
+        const modeIcon = { walk: '🚶', bus: '🚌', metro: '🚇', taxi: '🚕', ferry: '⛴️', tram: '🚊' };
 
-            const ratingHtml = act.rating ? `<span style="color:#f5b041; font-weight:bold;">★ ${act.rating}</span>` : '';
-            const reviewHtml = act.review_comment ? `<span style="font-size:0.8em; font-style:italic; color:var(--text-secondary);">"${act.review_comment}"</span>` : '';
-            const sourceHtml = act.source ? `<a href="${act.source}" target="_blank" rel="noopener" class="source-link">Details ↗</a>` : '';
+        // Build activity list items + transport connectors
+        let activitiesHtml = '';
+        if (dayActivities.length === 0) {
+            activitiesHtml = '<li style="color:var(--text-secondary); font-style:italic;">No activities listed for this day.</li>';
+        } else {
+            dayActivities.forEach((act, actIdx) => {
+                const nameLC = (act.name || '').toLowerCase();
+                const isTicketed = nameLC.includes('ticket required');
+                const isFree = nameLC.includes('free');
+                const badgeHtml = isTicketed
+                    ? `<span class="ticket-badge required">Ticket</span>`
+                    : isFree ? `<span class="ticket-badge free">Free</span>` : '';
 
-            return `
-            <li>
-                <div class="activity-header">
-                    <span class="activity-name">${act.name}</span>
-                    <div style="font-size:0.8em; color:var(--text-secondary);">${act.schedule || ''}</div>
-                    ${badgeHtml}
-                </div>
-                <div class="activity-meta" style="margin-bottom:4px; display:flex; gap:4px; align-items:center; flex-wrap:wrap;">
-                    <span class="cost-tag">RM ${actCostPax}/pax</span>
-                    <span style="font-size:0.8em; color:var(--text-secondary);">Total: RM ${actCostTotal}</span>
-                    ${ratingHtml} ${reviewHtml} ${sourceHtml}
-                </div>
-                <div style="border-radius:6px; overflow:hidden; margin-top:4px; border:1px solid rgba(0,0,0,0.06); max-width:350px;">
-                    <iframe src="${embedMap}" width="100%" height="100" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
-                </div>
-            </li>`;
-        }).join('') : '';
+                const embedMap = `https://maps.google.com/maps?q=${encodeURIComponent((act.name || 'location') + ' ' + dayLocation)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+                const actCostPax = act.cost_myr || 0;
+                const actCostTotal = actCostPax * numPax;
+
+                const ratingHtml = act.rating ? `<span style="color:#f5b041; font-weight:bold;">★ ${act.rating}</span>` : '';
+                const reviewHtml = act.review_comment ? `<span style="font-size:0.8em; font-style:italic; color:var(--text-secondary);">${act.review_comment}</span>` : '';
+                const sourceHtml = act.source ? `<a href="${act.source}" target="_blank" rel="noopener" class="source-link">Details ↗</a>` : '';
+
+                activitiesHtml += `
+                <li>
+                    <div class="activity-header">
+                        <span class="activity-name">${act.name || 'Activity'}</span>
+                        <div style="font-size:0.8em; color:var(--text-secondary);">${act.schedule || ''}</div>
+                        ${badgeHtml}
+                    </div>
+                    <div class="activity-meta" style="margin-bottom:4px; display:flex; gap:4px; align-items:center; flex-wrap:wrap;">
+                        <span class="cost-tag">RM ${actCostPax}/pax</span>
+                        <span style="font-size:0.8em; color:var(--text-secondary);">Total: RM ${actCostTotal}</span>
+                        ${ratingHtml} ${reviewHtml} ${sourceHtml}
+                    </div>
+                    <div style="border-radius:6px; overflow:hidden; margin-top:4px; border:1px solid rgba(0,0,0,0.06); max-width:350px;">
+                        <iframe src="${embedMap}" width="100%" height="100" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+                    </div>
+                </li>`;
+
+                // Render transport connector to next activity
+                const tn = act.transport_to_next;
+                if (tn && actIdx < dayActivities.length - 1) {
+                    const icon = modeIcon[tn.mode] || '➡️';
+                    const costText = tn.estimated_cost_myr > 0 ? `RM ${tn.estimated_cost_myr}/pax` : 'Free';
+                    activitiesHtml += `
+                    <div class="transport-connector">
+                        <span class="tc-mode">${icon}</span>
+                        <div class="tc-info">
+                            <span class="tc-duration">${tn.duration || ''} by ${tn.mode || 'transit'}</span>
+                            ${tn.notes ? `<span class="tc-notes">${tn.notes}</span>` : ''}
+                        </div>
+                        <span class="tc-cost">${costText}</span>
+                    </div>`;
+                }
+            });
+        }
+
 
         // Hotel
         const hotelName = day.hotel ? day.hotel.name : 'Not Specified';
@@ -449,7 +593,7 @@ function renderItinerary(itinerary, destinationReview, numPax) {
         const dayTransTotal = transCostPerPax * numPax;
 
         card.innerHTML = `
-            <h4>Day ${day.day}: ${day.location}</h4>
+            <h4>Day ${dayNum}: ${dayLocation}</h4>
             <ul>${activitiesHtml}</ul>
             <div class="daily-modules">
                 <div class="module-box">
@@ -484,7 +628,8 @@ function renderLedger(split, itinerary, flights, numPax) {
     numParticipants = numPax;
     if (!split || !split.primary_currency) return;
     currentTripData = { split, itinerary, flights, numPax };
-    document.getElementById('total-cost').innerText = `RM ${split.total_myr}`;
+    // Display total that will be reconciled when modal opens
+    document.getElementById('total-cost').innerText = `RM ${split.total_myr} (${numPax} pax)`;
     document.getElementById('split-person').innerText = `RM ${split.split_per_person_myr}`;
     document.getElementById('local-currency-label').innerText = `Local (${split.destination_currency})`;
     document.getElementById('split-local').innerText = `${split.split_per_person_local} ${split.destination_currency}`;
@@ -505,19 +650,26 @@ function populateAccountingTable(data) {
     const n = numPax || 1;
     let hotelTotal = 0, foodTotal = 0, transTotal = 0, actTotal = 0;
     itinerary.forEach(day => {
-        hotelTotal += (day.hotel ? day.hotel.cost_myr : 0) * n;
+        hotelTotal += (day.hotel ? (day.hotel.cost_myr || 0) : 0) * n;
         foodTotal += (day.daily_food_cost_myr || 0) * n;
-        transTotal += (day.transportation ? day.transportation.cost_myr : 0) * n;
+        transTotal += (day.transportation ? (day.transportation.cost_myr || 0) : 0) * n;
         if (day.activities) day.activities.forEach(act => actTotal += (act.cost_myr || 0) * n);
     });
     const flightCostPerPax = selectedFlightOption ? (selectedFlightOption.cost_myr || 0) : (flights ? (flights.cost_myr || 0) : 0);
     const flightCostTotal = flightCostPerPax * n;
-    document.getElementById('acc-flights').innerText = `RM ${flightCostTotal} (${n} x RM ${flightCostPerPax})`;
-    document.getElementById('acc-hotel').innerText = `RM ${hotelTotal}`;
-    document.getElementById('acc-food').innerText = `RM ${foodTotal}`;
-    document.getElementById('acc-trans').innerText = `RM ${transTotal}`;
-    document.getElementById('acc-act').innerText = `RM ${actTotal}`;
-    document.getElementById('acc-total').innerText = `RM ${split.total_myr}`;
+
+    // Compute grand total from itemized sums (source of truth for all pax)
+    const grandTotal = Math.round(flightCostTotal + hotelTotal + foodTotal + transTotal + actTotal);
+
+    document.getElementById('acc-flights').innerText = `RM ${flightCostTotal} (${n} pax × RM ${flightCostPerPax})`;
+    document.getElementById('acc-hotel').innerText = `RM ${hotelTotal} (${n} pax)`;
+    document.getElementById('acc-food').innerText = `RM ${foodTotal} (${n} pax)`;
+    document.getElementById('acc-trans').innerText = `RM ${transTotal} (${n} pax)`;
+    document.getElementById('acc-act').innerText = `RM ${actTotal} (${n} pax)`;
+    // Use locally computed total — reliable for all pax regardless of LLM response
+    document.getElementById('acc-total').innerText = `RM ${grandTotal} (${n} pax)`;
+    // Also update the summary card total to match
+    document.getElementById('total-cost').innerText = `RM ${grandTotal} (${n} pax)`;
 }
 
 // Live card preview
@@ -660,3 +812,139 @@ document.getElementById('download-pdf-btn').addEventListener('click', () => {
         if (document.body.contains(clone)) document.body.removeChild(clone);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Feature #5: Voice Input via Web Speech API
+// ─────────────────────────────────────────────────────────────────────────────
+(function initVoiceInput() {
+    const voiceBtn = document.getElementById('voice-btn');
+    const voiceStatus = document.getElementById('voice-status');
+    const promptInput = document.getElementById('prompt-input');
+
+    // Check browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        // Hide mic button gracefully — browser doesn't support it
+        if (voiceBtn) voiceBtn.classList.add('hidden');
+        return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;        // Keep listening through pauses
+    recognition.interimResults = true;    // Show live interim text
+    recognition.lang = 'en-MY';           // Malaysian English
+    recognition.maxAlternatives = 1;
+
+    let isRecording = false;
+    let wantToStop = false;  // User explicitly clicked stop
+    let interimBase = '';    // Text already in textarea before voice started
+
+    function setRecordingState(active) {
+        isRecording = active;
+        if (active) {
+            voiceBtn.classList.add('recording');
+            voiceBtn.querySelector('.voice-icon').textContent = '🔴';
+            voiceBtn.title = 'Click to stop recording';
+            voiceStatus.textContent = '🎙️ Listening... speak your trip request (click mic to stop)';
+            voiceStatus.className = 'voice-status listening';
+        } else {
+            voiceBtn.classList.remove('recording');
+            voiceBtn.querySelector('.voice-icon').textContent = '🎤';
+            voiceBtn.title = 'Click to speak your trip request';
+            voiceStatus.className = 'voice-status';
+        }
+    }
+
+    voiceBtn.addEventListener('click', () => {
+        if (isRecording) {
+            wantToStop = true;
+            recognition.stop();
+            return;
+        }
+        wantToStop = false;
+        interimBase = promptInput.value;
+        try {
+            recognition.start();
+        } catch (e) {
+            voiceStatus.textContent = '⚠️ Could not start microphone: ' + e.message;
+            voiceStatus.className = 'voice-status error';
+        }
+    });
+
+    recognition.onstart = () => {
+        setRecordingState(true);
+    };
+
+    recognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalTranscript += transcript;
+            } else {
+                interimTranscript += transcript;
+            }
+        }
+        // Show live interim preview in textarea
+        const separator = interimBase && !interimBase.endsWith(' ') && (interimTranscript || finalTranscript) ? ' ' : '';
+        if (interimTranscript) {
+            promptInput.value = interimBase + separator + interimTranscript;
+            voiceStatus.textContent = '🎙️ ' + interimTranscript;
+        }
+        if (finalTranscript) {
+            const combined = interimBase + separator + finalTranscript.trim();
+            promptInput.value = combined;
+            interimBase = combined;
+            voiceStatus.textContent = '🎙️ Listening... pause is OK, keep talking';
+            voiceStatus.className = 'voice-status listening';
+        }
+    };
+
+    recognition.onend = () => {
+        // If user didn't explicitly stop, auto-restart to tolerate pauses
+        if (!wantToStop && isRecording) {
+            try {
+                recognition.start();
+                return;  // Stay in recording state
+            } catch (_) {
+                // Browser refused restart — fall through to stop
+            }
+        }
+        setRecordingState(false);
+        wantToStop = false;
+        if (promptInput.value.trim() && interimBase.trim()) {
+            voiceStatus.textContent = '✅ Done! You can edit the text or click mic again.';
+        } else if (!voiceStatus.textContent.startsWith('⚠️')) {
+            voiceStatus.textContent = '';
+        }
+        // Auto-clear success message after 3s
+        setTimeout(() => {
+            if (voiceStatus.textContent.startsWith('✅')) {
+                voiceStatus.textContent = '';
+                voiceStatus.className = 'voice-status';
+            }
+        }, 3000);
+    };
+
+    recognition.onerror = (event) => {
+        // "no-speech" is normal during pauses — don't stop, just let onend auto-restart
+        if (event.error === 'no-speech' && !wantToStop) {
+            return;  // onend will auto-restart
+        }
+        setRecordingState(false);
+        wantToStop = false;
+        const msgs = {
+            'not-allowed': '⚠️ Microphone access denied. Please allow it in browser settings.',
+            'no-speech':   '⚠️ No speech detected. Try speaking closer to the mic.',
+            'network':     '⚠️ Network error during voice recognition.',
+            'aborted':     ''
+        };
+        const msg = msgs[event.error] ?? `⚠️ Voice error: ${event.error}`;
+        if (msg) {
+            voiceStatus.textContent = msg;
+            voiceStatus.className = 'voice-status error';
+            setTimeout(() => { voiceStatus.textContent = ''; voiceStatus.className = 'voice-status'; }, 4000);
+        }
+    };
+})();

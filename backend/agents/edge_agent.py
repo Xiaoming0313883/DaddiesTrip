@@ -2,37 +2,37 @@ from .base_agent import BaseAgent
 
 class EdgeAgent(BaseAgent):
     def validate(self, final_json):
-        # 1. Python-side heuristic checks
-        errors = []
-        flights = final_json.get("flights", {})
-        dep_air = flights.get("departure", {}).get("airport", "").upper()
-        ret_air = flights.get("return", {}).get("airport", "").upper()
-        
-        if dep_air and ret_air and dep_air == ret_air:
-            errors.append(f"Departure and Return airports are the same ({dep_air} to {ret_air}). This is impossible for a round trip. Fix the return flight to be FROM the destination.")
-            
+        """Python-only heuristic validation — no LLM call needed."""
+        itinerary = final_json.get("itinerary", [])
+
+        # Fix 1: Collect all activity costs to detect RM25 hallucination
         all_act_costs = []
-        for day in final_json.get("itinerary", []):
+        for day in itinerary:
             for act in day.get("activities", []):
                 cost = act.get("cost_myr", 0)
                 if cost > 0:
                     all_act_costs.append(cost)
-        
+
         if len(all_act_costs) >= 3 and len(set(all_act_costs)) == 1 and all_act_costs[0] == 25:
-            errors.append("Every single attraction cost is exactly RM25. This is a hallucination. Please find actual diverse ticket prices or mark as Free.")
-            
-        if not errors:
-            return final_json
-            
-        # 2. If errors, ask LLM to fix specifically
-        print(f"Edge Agent detected errors: {errors}")
-        system_prompt = f"""
-        You are the Edge Case Handling Agent for DaddiesTrip.
-        The current trip data has the following LOGICAL ERRORS:
-        {". ".join(errors)}
-        
-        Fix the JSON and return the CORRECTED version. 
-        - Ensure return airport is different from departure.
-        - Ensure attraction costs are realistic and not all the same default value.
-        """
-        return self.query(system_prompt, f"JSON to Fix: {final_json}")
+            print("Edge: RM25 hallucination detected — zeroing activity costs for re-display")
+            for day in itinerary:
+                for act in day.get("activities", []):
+                    if act.get("cost_myr") == 25:
+                        act["cost_myr"] = 0
+
+        # Fix 2: Detect same departure/return airport (round-trip impossibility)
+        flights = final_json.get("flights", {})
+        dep = (flights.get("departure", {}).get("airport") or "").upper()
+        ret = (flights.get("return", {}).get("airport") or "").upper()
+        if dep and ret and dep == ret:
+            print(f"Edge: Same airport round-trip detected ({dep}→{ret}), flagging in metadata")
+            final_json["_edge_warning"] = f"Return airport same as departure ({dep}). Verify flights."
+
+        # Fix 3: Ensure every day has required fields
+        for idx, day in enumerate(itinerary):
+            if not day.get("day"):
+                day["day"] = idx + 1
+            if not day.get("location"):
+                day["location"] = "Destination"
+
+        return final_json

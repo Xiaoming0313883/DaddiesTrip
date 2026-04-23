@@ -27,7 +27,7 @@ class BaseAgent:
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
-            timeout=120.0
+            timeout=180.0
         )
 
     @staticmethod
@@ -52,7 +52,106 @@ class BaseAgent:
             return e
         return AgentAPIError("An unexpected error occurred. Please try again.", detail=str(e))
 
-    def query(self, system_prompt, user_prompt, format_json=True, max_retries=2):
+    @staticmethod
+    def _count_open_brackets(s):
+        """Count unmatched { and [ in a JSON string, respecting string literals."""
+        stack = []
+        in_string = False
+        escape = False
+        for ch in s:
+            if escape:
+                escape = False
+                continue
+            if ch == '\\':
+                escape = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch in ('{', '['):
+                stack.append(ch)
+            elif ch == '}' and stack and stack[-1] == '{':
+                stack.pop()
+            elif ch == ']' and stack and stack[-1] == '[':
+                stack.pop()
+        return stack
+
+    @staticmethod
+    def _parse_json_robust(text):
+        """
+        Parse JSON from LLM output with repair for common issues:
+        - Trailing commas before } or ]
+        - Truncated output (missing closing brackets/braces)
+        - Markdown code fences (```json ... ```)
+        """
+        # Strip markdown code fences if present
+        text = re.sub(r'```(?:json)?\s*', '', text).strip()
+
+        # Extract the outermost JSON object
+        json_match = re.search(r'(\{.*)', text, re.DOTALL)
+        if not json_match:
+            raise ValueError(f"No JSON object found in output: {text[:200]}...")
+
+        raw = json_match.group(1)
+
+        # Try parsing as-is first
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            pass
+
+        # Repair step 1: Remove trailing commas before } or ]
+        repaired = re.sub(r',\s*([}\]])', r'\1', raw)
+        try:
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            pass
+
+        # Repair step 2: Close any unclosed strings, remove trailing junk, close brackets
+        # If we're inside an unclosed string, close it
+        quote_count = 0
+        esc = False
+        for ch in repaired:
+            if esc:
+                esc = False
+                continue
+            if ch == '\\':
+                esc = True
+                continue
+            if ch == '"':
+                quote_count += 1
+        if quote_count % 2 == 1:
+            repaired += '"'
+
+        # Remove trailing partial tokens (e.g. a key without value, or dangling comma)
+        repaired = re.sub(r',\s*"[^"]*"\s*:\s*$', '', repaired)  # trailing "key":
+        repaired = re.sub(r',\s*"[^"]*"\s*$', '', repaired)      # trailing "key"
+        repaired = re.sub(r',\s*$', '', repaired)                 # trailing comma
+        repaired = re.sub(r':\s*$', ': null', repaired)           # trailing colon → null
+
+        # Close unclosed brackets/braces (in reverse stack order)
+        stack = BaseAgent._count_open_brackets(repaired)
+        for opener in reversed(stack):
+            repaired += '}' if opener == '{' else ']'
+
+        # Remove trailing commas again (closing may have created new ones)
+        repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
+
+        try:
+            return json.loads(repaired)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"JSON repair failed ({e}). Raw output: {raw[:300]}...")
+
+    def query(self, system_prompt, user_prompt, format_json=True, max_retries=1, max_tokens=4096):
+        """
+        Query the LLM using STREAMING mode.
+        
+        Streaming keeps the HTTP connection alive by receiving tokens incrementally.
+        This prevents Cloudflare/gateway 504 timeouts which occur when the server
+        waits too long for the first byte of a non-streamed response.
+        """
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
@@ -64,21 +163,30 @@ class BaseAgent:
         last_error = None
         for attempt in range(max_retries + 1):
             try:
-                response = self.client.chat.completions.create(
+                # Use streaming to prevent gateway timeouts.
+                # With stream=True, tokens arrive incrementally, keeping the
+                # connection alive even if full generation takes 60+ seconds.
+                stream = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
-                    temperature=0.3
+                    temperature=0.3,
+                    max_tokens=max_tokens,
+                    stream=True
                 )
 
-                text = response.choices[0].message.content
+                # Collect streamed chunks into full text
+                text = ""
+                for chunk in stream:
+                    delta = chunk.choices[0].delta if chunk.choices else None
+                    if delta and delta.content:
+                        text += delta.content
+
+                if not text.strip():
+                    # Treat as retryable — don't hard-fail
+                    raise ValueError("LLM returned empty response.")
+
                 if format_json:
-                    json_match = re.search(r'(\{.*\})', text, re.DOTALL)
-                    if json_match:
-                        return json.loads(json_match.group(1))
-                    try:
-                        return json.loads(text)
-                    except json.JSONDecodeError:
-                        raise ValueError(f"Agent failed to return valid JSON. Output was: {text[:100]}...")
+                    return self._parse_json_robust(text)
                 return text
             except AgentAPIError:
                 raise
@@ -86,7 +194,7 @@ class BaseAgent:
                 last_error = self._friendly_error(e)
                 print(f"API Error in {self.__class__.__name__} (attempt {attempt + 1}/{max_retries + 1}): {e}")
                 if attempt < max_retries:
-                    time.sleep(3 * (attempt + 1))
+                    time.sleep(2 * (attempt + 1))
             except Exception as e:
                 last_error = self._friendly_error(e)
                 print(f"Error in {self.__class__.__name__} (attempt {attempt + 1}/{max_retries + 1}): {e}")

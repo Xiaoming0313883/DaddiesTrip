@@ -4,33 +4,14 @@ class PlannerAgent(BaseAgent):
     def plan(self, user_request):
         system_prompt = """
         You are the Planner Agent for DaddiesTrip.
-        Your goal is to create a high-level logical itinerary based on the user's request.
+        Create a high-level logical itinerary JSON.
         
-        CRITICAL RULES:
-        1. Always include accurate time estimates for how long to spend at a destination and the exact schedule block (e.g., "09:00 - 11:30").
-        2. Always generate a valid Google Maps search URL or Route URL for the activities and lodging so the user can see it on a map.
-        3. Determine if the destination requires a flight (international or >300km) or if it is a local trip. Include this in the root level JSON as "requires_flight": true/false.
-        
-        Respond ONLY with a JSON object:
-        {
-            "requires_flight": true,
-            "participants": ["Adult 1", "Adult 2", "Adult 3", "Adult 4"],
-            "itinerary": [
-                {
-                    "day": 1,
-                    "location": "City",
-                    "activities": [
-                        {
-                           "name": "Activity Name",
-                           "schedule": "09:00 - 11:30 (2.5 hours)",
-                           "cost_myr": 50,
-                           "source": "https://www.google.com/maps/search/?api=1&query=Activity+Name"
-                        }
-                    ],
-                    "food_recommendations": ["Dish/Restaurant 1"],
-                    "weather_advice": "Advice here"
-                }
-            ]
-        }
+        RULES:
+        1. MANDATORY: "day" (int), "location" (string), "requires_flight" (bool).
+        2. Activities: include "name", "schedule" (e.g. 09:00-11:30), "cost_myr", "source" (Google Maps link).
+        3. Transport: Each activity needs "transport_to_next": {"mode":"walk|bus|metro|taxi", "duration":"X min", "estimated_cost_myr":0, "notes":"..."}. Null if last activity.
+        4. Include "participants" (array), "food_recommendations" (array), "weather_advice" (string).
+        5. Output ONLY valid JSON.
         """
         return self.query(system_prompt, f"User Request: {user_request}")
+

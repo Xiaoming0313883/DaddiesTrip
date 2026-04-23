@@ -7,7 +7,7 @@
     <title>DaddiesTrip</title>
     <meta name="description"
         content="AI-enabled cross-border travel orchestration and multi-currency group accounting.">
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=9">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 </head>
 
@@ -27,8 +27,15 @@
             <div class="input-section glass-card">
                 <textarea id="prompt-input"
                     placeholder="Plan a 7-day trip to Singapore for 4 adults with a budget of RM20000..."></textarea>
-                <button id="generate-btn">Orchestrate Trip</button>
+                <div class="input-actions-row">
+                    <button id="generate-btn">Orchestrate Trip</button>
+                    <button id="voice-btn" class="voice-btn" title="Click to speak your trip request" aria-label="Voice input">
+                        <span class="voice-icon">🎤</span>
+                    </button>
+                </div>
+                <div id="voice-status" class="voice-status hidden"></div>
             </div>
+
 
             <div id="results-section" class="hidden">
                 <div id="budget-banner" class="budget-banner hidden">
