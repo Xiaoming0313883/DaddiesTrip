@@ -8,3 +8,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>,
 )
+
+// Fade out and remove the inline splash screen once React has mounted
+const splash = document.getElementById('splash')
+if (splash) {
+  splash.style.opacity = '0'
+  setTimeout(() => splash.remove(), 400)
+}

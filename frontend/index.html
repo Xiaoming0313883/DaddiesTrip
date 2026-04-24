@@ -7,7 +7,15 @@
     <title>DaddiesTrip - AI Travel</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Inline loading screen - renders instantly, no JS needed -->
+      <div id="splash" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#FDF9F3;z-index:9999;transition:opacity .4s">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#DE8170" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px;animation:splashPulse 1.5s ease-in-out infinite"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+        <h1 style="font-family:Georgia,serif;font-size:2.5rem;font-weight:700;color:#3A332C;margin:0 0 8px">DaddiesTrip</h1>
+        <p style="font-family:sans-serif;font-size:.95rem;color:#9CA3AF;letter-spacing:.05em">Preparing your journey...</p>
+        <style>@keyframes splashPulse{0%,100%{opacity:1;transform:translateY(0)}50%{opacity:.6;transform:translateY(-6px)}}</style>
+      </div>
+    </div>
     <script type="module" src="/main.jsx"></script>
   </body>
 </html>
