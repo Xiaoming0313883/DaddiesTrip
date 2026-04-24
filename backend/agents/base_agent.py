@@ -166,20 +166,15 @@ class BaseAgent:
                 # Use streaming to prevent gateway timeouts.
                 # With stream=True, tokens arrive incrementally, keeping the
                 # connection alive even if full generation takes 60+ seconds.
-                stream = self.client.chat.completions.create(
+                response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
                     temperature=0.3,
                     max_tokens=max_tokens,
-                    stream=True
+                    stream=False
                 )
 
-                # Collect streamed chunks into full text
-                text = ""
-                for chunk in stream:
-                    delta = chunk.choices[0].delta if chunk.choices else None
-                    if delta and delta.content:
-                        text += delta.content
+                text = response.choices[0].message.content if response.choices else ""
 
                 if not text.strip():
                     # Treat as retryable — don't hard-fail
