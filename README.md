@@ -19,9 +19,9 @@
 
   <br />
 
-  <p><em>DaddiesTrip — Sit back, relax, let daddy handle the itinerary.</em></p>
+  <p><em>DaddiesTrip — Sit back, relax, let daddy handle the itinerary.😎</em></p>
 
-  <blockquote><strong>"SugarDaddies: We take care of everything. Especially you."</strong></blockquote>
+  <blockquote><strong>"SugarDaddies: We take care of everything. Especially you.😘"</strong></blockquote>
 </div>
 
 <br />
@@ -365,5 +365,7 @@ python -m pytest backend/tests/test_agents.py -v
 This project was built for the **UM Hackathon 2026** by students of Universiti Teknologi Malaysia.
 
 <div align="center">
-  <i>Engineered by ❤️ from UTM's students</i>
+  <i>Engineered by ❤️ from UTM's SugarDaddies</i>
+  <br />
+  <blockquote><strong>"SugarDaddies: We take care of everything. Especially you.😘"</strong></blockquote>
 </div>
